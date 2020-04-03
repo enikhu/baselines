@@ -41,6 +41,8 @@ def rollout(env, policy, max_pathlength, animate=False, obfilter=None):
         if done:
             terminated = True
             break
+    #print('----------sampled so far--------------')
+    #print(len(obs))
     return {"observation" : np.array(obs), "terminated" : terminated,
             "reward" : np.array(rewards), "action" : np.array(acs),
             "action_dist": np.array(ac_dists), "logp" : np.array(logps)}
@@ -49,9 +51,9 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, num_timesteps,
     animate=False, callback=None, desired_kl=0.002):
 
     obfilter = ZFilter(env.observation_space.shape)
-
-    max_pathlength = env.spec.timestep_limit
-    stepsize = tf.Variable(initial_value=np.float32(np.array(0.03)), name='stepsize')
+    #print('timesteps_per_batch_config: ',str(timesteps_per_batch), ' num_timesteps ', str(num_timesteps))
+    max_pathlength = 1000
+    stepsize = tf.Variable(initial_value=np.float32(np.array(0.01)), name='stepsize')
     inputs, loss, loss_sampled = policy.update_info
     optim = kfac.KfacOptimizer(learning_rate=stepsize, cold_lr=stepsize*(1-0.9), momentum=0.9, kfac_update=2,\
                                 epsilon=1e-2, stats_decay=0.99, async_=1, cold_iter=1,
@@ -73,12 +75,17 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, num_timesteps,
         enqueue_threads.extend(qr.create_threads(tf.get_default_session(), coord=coord, start=True))
 
     i = 0
+    gamma_orig = gamma
     timesteps_so_far = 0
     while True:
+        #print('-------------------------------------------------------------------')
+        #print(timesteps_so_far)
         if timesteps_so_far > num_timesteps:
             break
         logger.log("********** Iteration %i ************"%i)
-
+        
+        if i > 0:
+            gamma = gamma_orig * (1 - 0.00005) ** i
         # Collect paths until we have enough timesteps
         timesteps_this_batch = 0
         paths = []
@@ -87,8 +94,11 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, num_timesteps,
             paths.append(path)
             n = pathlength(path)
             timesteps_this_batch += n
+            #print('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
+            #print(n)
+            #print(timesteps_this_batch)
             timesteps_so_far += n
-            if timesteps_this_batch > timesteps_per_batch:
+            if timesteps_this_batch >= timesteps_per_batch:
                 break
 
         # Estimate advantage function

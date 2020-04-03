@@ -9,6 +9,7 @@ except ImportError:
     MPI = None
 
 import gym
+import pybulletgym
 from gym.wrappers import FlattenDictWrapper
 from baselines import logger
 from baselines.bench import Monitor
